@@ -1,5 +1,7 @@
 # APK2IPK Studio for Windows
 
+Current application version: **0.3.0** (shown in the window title).
+
 Download **APK2IPK-Studio.exe** from the assets below and double-click it. No installation, Python or terminal commands are required. This download targets Windows x64.
 
 1. Click **Choose APK…** and select your Android app file.
@@ -8,6 +10,10 @@ Download **APK2IPK-Studio.exe** from the assets below and double-click it. No in
 4. Click **Open output folder** to find the `.ipk` file.
 
 Advanced settings are optional. The executable includes its Python and Tk runtimes. It runs locally and does not upload your APK.
+
+Version 0.3.0 also detects HTML pages with other names, pages under `res/raw`, and supported browser JavaScript bundles without an HTML entry. For those bundles it automatically generates an entry HTML page. Advanced settings includes a picker for all detected pages/components and an optional browser JS entry.
+
+This does **not** convert native Android code into JavaScript. The inspected Reezn 2.0.20 APK contains native Android screens/libraries and an Android-dependent YouTube HTML template; it cannot be reconstructed as a working Reezn webOS app by this feature.
 
 Conversion packages reusable web files. Native Android screens and APIs require a webOS-compatible version; the app explains this if it cannot create a useful package. Inspector findings never disable features. Creating an IPK does not verify functionality on a TV.
 

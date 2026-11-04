@@ -9,6 +9,7 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from . import __version__
 from .analyze import inspect_apk, markdown
 from .convert import convert
 
@@ -40,7 +41,7 @@ def suggested_settings(apk_path, report):
     chosen = candidates[0] if candidates else {"root": "", "entry": "index.html"}
     identity = hashlib.sha256(manifest.get("package", "").encode()).hexdigest() if manifest.get("package") else report["sha256"]
     return dict(title=title, app_id="org.apk2ipk.app" + identity[:16],
-                version=version, asset_root=chosen["root"], entry=chosen["entry"])
+                version=version, asset_root=chosen["root"], entry=chosen["entry"], bootstrap_script=chosen.get("script", ""))
 
 
 class App:
@@ -49,7 +50,7 @@ class App:
         self.events = queue.Queue()
         self.busy = False
         self.details_text = "Choose an APK to see its compatibility details."
-        root.title("APK2IPK Studio — LG TV converter")
+        root.title(f"APK2IPK Studio {__version__} — LG TV converter")
         root.geometry("940x760")
         root.minsize(800, 690)
         root.configure(bg="#101820")
@@ -94,20 +95,27 @@ class App:
         self.version = tk.StringVar(value="1.0.0")
         self.asset_root = tk.StringVar()
         self.entry = tk.StringVar(value="index.html")
+        self.bootstrap_script = tk.StringVar()
         self.web = tk.StringVar()
         self.inputs = [title_entry]
         for row, (label, var) in enumerate((("TV application ID", self.app_id), ("Version", self.version),
-                                            ("APK web folder", self.asset_root), ("HTML entry", self.entry))):
+                                            ("APK web folder", self.asset_root), ("HTML entry", self.entry),
+                                            ("Generate HTML from JS (optional)", self.bootstrap_script))):
             ttk.Label(self.advanced, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=3)
             field = ttk.Entry(self.advanced, textvariable=var)
             field.grid(row=row, column=1, sticky="ew", pady=3)
             self.inputs.append(field)
-        ttk.Label(self.advanced, text="Rebuilt web app (optional)").grid(row=4, column=0, sticky="w", padx=(0, 12))
-        ttk.Entry(self.advanced, textvariable=self.web, state="readonly").grid(row=4, column=1, sticky="ew")
+        ttk.Label(self.advanced, text="Rebuilt web app (optional)").grid(row=5, column=0, sticky="w", padx=(0, 12))
+        ttk.Entry(self.advanced, textvariable=self.web, state="readonly").grid(row=5, column=1, sticky="ew")
         self.web_button = ttk.Button(self.advanced, text="Choose web folder…", command=self.pick_web)
-        self.web_button.grid(row=4, column=2, padx=(8, 0))
+        self.web_button.grid(row=5, column=2, padx=(8, 0))
         self.clear_web_button = ttk.Button(self.advanced, text="Clear", command=lambda: self.web.set(""))
-        self.clear_web_button.grid(row=5, column=2, sticky="e")
+        self.clear_web_button.grid(row=6, column=2, sticky="e")
+        ttk.Label(self.advanced, text="Detected pages / JS entries").grid(row=7, column=0, sticky="w", padx=(0, 12))
+        self.page_choice = tk.StringVar()
+        self.page_picker = ttk.Combobox(self.advanced, textvariable=self.page_choice, state="readonly")
+        self.page_picker.grid(row=7, column=1, columnspan=2, sticky="ew")
+        self.page_picker.bind("<<ComboboxSelected>>", self.choose_entry)
         self.advanced.grid_remove()
         actions = ttk.Frame(main)
         actions.grid(row=10, sticky="ew", pady=(8, 12))
@@ -144,6 +152,8 @@ class App:
         self.report, self.last_output = None, None
         self.web.set("")
         self.asset_root.set("")
+        self.bootstrap_script.set("")
+        self.page_picker.configure(values=())
         self.open_button.configure(state="disabled")
         self.work("Reading your APK…", lambda: ("analysis", inspect_apk(path)))
 
@@ -163,9 +173,24 @@ class App:
         if path:
             self.web.set(path)
             self.asset_root.set("")
+            self.bootstrap_script.set("")
             if not self.apk.get():
                 self.output.set(str(next_output(Path(path).with_suffix(".apk"))))
             self.convert_button.configure(state="normal")
+
+    def choose_entry(self, _event=None):
+        if self.busy or not self.report:
+            return
+        entries = self.report["web_candidates"] + self.report.get("embedded_web_components", [])
+        selected = next((c for c in entries if c["path"] == self.page_choice.get()), None)
+        if selected:
+            self.web.set("")
+            self.asset_root.set(selected["root"])
+            self.entry.set(selected["entry"])
+            self.bootstrap_script.set(selected.get("script", ""))
+            if selected["kind"] == "native-html-template":
+                self.status.set("Embedded component selected — this will not recreate the whole Android app.")
+                self.summary.set("This HTML component requires Android integration: " + "; ".join(selected["dependencies"]) + ". Packaging it alone will not provide the original app's screens or features.")
 
     def work(self, label, operation):
         if self.busy:
@@ -193,8 +218,10 @@ class App:
             if not self.output.get():
                 return
         if self.report and not self.report["web_candidates"] and not self.web.get() and not self.asset_root.get():
-            self.status.set("This Android app needs a webOS version.")
-            self.summary.set("This APK has no web app that LG webOS can run. Its Android screens and features need to be rebuilt for webOS.\n\nThe inspector has not disabled any features. Packaging cannot supply the missing Android runtime.")
+            self.status.set("No standalone browser entry was detected.")
+            parts = self.report.get("embedded_web_components", [])
+            details = ("Found " + ", ".join(c["path"] for c in parts) + ". These are embedded components with Android dependencies, not the complete app. ") if parts else ""
+            self.summary.set(details + "Adding an HTML file cannot translate the native Android screens or logic. A separate webOS implementation is required.\n\nNo features were disabled. View details for the detected content, or use Advanced settings to explicitly export a component.")
             return
         if Path(self.output.get()).exists():
             if self.last_output and Path(self.output.get()) == self.last_output:
@@ -202,7 +229,8 @@ class App:
         args = dict(apk_path=self.apk.get() or None, web_dir=self.web.get() or None,
                     asset_root=None if self.web.get() else (self.asset_root.get() or None),
                     entry=self.entry.get(), app_id=self.app_id.get(), title=self.title.get(),
-                    version=self.version.get(), output=self.output.get())
+                    version=self.version.get(), output=self.output.get(),
+                    bootstrap_script=self.bootstrap_script.get() or None)
         self.work("Converting your app…", lambda: ("build", convert(**args)))
 
     def open_output(self):
@@ -249,6 +277,7 @@ class App:
             if kind == "analysis":
                 self.report = result
                 self.convert_button.configure(state="normal")
+                self.page_picker.configure(values=[c["path"] for c in result["web_candidates"] + result.get("embedded_web_components", [])])
                 for key, val in suggested_settings(self.apk.get(), result).items():
                     getattr(self, key).set(val)
                 self.details_text = markdown(result)
@@ -256,9 +285,12 @@ class App:
                 self.status.set("APK ready — click Convert to IPK." if count else "APK read — this app needs a webOS version.")
                 if count:
                     extra = " Multiple web folders were found; Advanced settings lets you choose another." if count > 1 else ""
-                    self.summary.set("Your app's web files can be packaged. The name, TV app ID, version and output folder have been filled in for you." + extra + "\n\nFeature findings are informational. Android-specific features still need compatible implementations on the TV.")
+                    generated = " A new HTML page will be generated to load the detected browser JavaScript." if self.bootstrap_script.get() else ""
+                    self.summary.set("Browser content was found and can be packaged. Settings have been filled in for you." + generated + extra + "\n\nThis entry may be only part of the app. Android-specific features still need compatible implementations on the TV.")
                 else:
-                    self.summary.set("This app uses Android's own screens/runtime and contains no detected web app. It cannot be automatically converted to a working LG TV app.\n\nNo features were blocked. A webOS-compatible version must be built first.")
+                    components = result.get("embedded_web_components", [])
+                    detail = (f"Found {len(components)} embedded HTML component(s) that need Android data/callbacks, not a complete browser app. " if components else "No standalone HTML or supported browser JavaScript entry was detected. ")
+                    self.summary.set(detail + "The Android screens and logic cannot be turned into a working app merely by adding index.html.\n\nNative libraries: " + str(len(result["native_libraries"])) + ". View details for evidence. Advanced settings can explicitly select an embedded component.")
             else:
                 self.last_output = Path(result["output"]).resolve()
                 self.open_button.configure(state="normal")
@@ -281,15 +313,10 @@ def smoke_test():
     import zipfile
     from .package import verify_ipk
     with tempfile.TemporaryDirectory() as directory:
-        apk = Path(directory) / "Sample App.apk"
-        with zipfile.ZipFile(apk, "w") as archive:
-            archive.writestr("AndroidManifest.xml", '<manifest package="org.example.smoketest"><application/></manifest>')
-            archive.writestr("assets/www/index.html", "<!doctype html><html><body>GUI test</body></html>")
         root = tk.Tk()
         root.withdraw()
         try:
             app = App(root)
-            app.select_apk(apk)
             def wait():
                 deadline = time.monotonic() + 20
                 while app.busy and time.monotonic() < deadline:
@@ -297,13 +324,24 @@ def smoke_test():
                     time.sleep(0.02)
                 if app.busy:
                     raise RuntimeError("GUI worker timed out")
-            wait()
-            if app.report is None or not app.asset_root.get():
-                raise RuntimeError("Automatic APK selection/analysis failed")
-            app.convert_button.invoke()
-            wait()
-            if not app.last_output:
-                raise RuntimeError("GUI conversion failed: " + app.summary.get())
-            verify_ipk(next(app.last_output.glob("*.ipk")))
+            for generated in (False, True):
+                apk = Path(directory) / ("No HTML App.apk" if generated else "Sample App.apk")
+                with zipfile.ZipFile(apk, "w") as archive:
+                    archive.writestr("AndroidManifest.xml", '<manifest package="org.example.smoketest"><application/></manifest>')
+                    if generated:
+                        archive.writestr("assets/www/main.js", 'document.getElementById("app").textContent = "Recovered";')
+                    else:
+                        archive.writestr("assets/www/index.html", "<!doctype html><html><body>GUI test</body></html>")
+                app.select_apk(apk)
+                wait()
+                if app.report is None or not app.asset_root.get():
+                    raise RuntimeError("Automatic APK selection/analysis failed")
+                if bool(app.bootstrap_script.get()) != generated:
+                    raise RuntimeError("HTML recovery mode was not selected correctly")
+                app.convert_button.invoke()
+                wait()
+                if not app.last_output:
+                    raise RuntimeError("GUI conversion failed: " + app.summary.get())
+                verify_ipk(next(app.last_output.glob("*.ipk")))
         finally:
             root.destroy()

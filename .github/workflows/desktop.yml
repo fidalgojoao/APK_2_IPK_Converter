@@ -50,4 +50,5 @@ jobs:
           if ! gh release view desktop-latest > /dev/null 2>&1; then
             gh release create desktop-latest --target "$GITHUB_SHA" --title "APK2IPK Studio — Windows download" --notes-file docs/DOWNLOAD.md
           fi
+          gh release edit desktop-latest --title "APK2IPK Studio — Windows download" --notes-file docs/DOWNLOAD.md
           gh release upload desktop-latest dist/APK2IPK-Studio.exe --clobber

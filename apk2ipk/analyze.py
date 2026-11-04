@@ -1,10 +1,11 @@
 """Evidence-based feasibility reporting, never a compatibility guarantee."""
 import hashlib
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 from .archive import APK, ConversionError
 from .manifest import parse_manifest, metadata
+from .recover import discover_entries
 
 RULES = [
     ("cordova", r"\bcordova\b|\bPhoneGap\b", "Cordova/PhoneGap bridge", "Port each plugin to browser or documented webOS APIs. Android cordova.js is not a webOS runtime."),
@@ -22,7 +23,7 @@ RULES = [
 def scan_web(files: dict[str, bytes]) -> list[dict]:
     found = {}
     for name, data in files.items():
-        if not name.lower().endswith((".js", ".html", ".htm", ".json", ".xml", ".css")):
+        if not name.lower().endswith((".js", ".mjs", ".html", ".htm", ".json", ".xml", ".css")):
             continue
         if len(data) > 4 * 1024 * 1024:
             found.setdefault("scan-limit", {"id": "scan-limit", "title": "Large text asset not scanned", "action": "Review text assets larger than 4 MiB manually.", "evidence": []})["evidence"].append(name)
@@ -41,18 +42,18 @@ def inspect_apk(path: str | Path) -> dict:
         if manifest["split"]:
             raise ConversionError("This is a split APK. Supply the standalone/base APK and obtain a complete web export if assets are split.")
         names = sorted(apk.members)
-        candidates = []
-        for n in names:
-            if n.startswith("assets/") and PurePosixPath(n).name.lower() in ("index.html", "index.htm"):
-                candidates.append({"root": str(PurePosixPath(n).parent), "entry": PurePosixPath(n).name})
         scripts = {n: apk.read(n, 4 * 1024 * 1024) for n in names
-                   if n.startswith("assets/") and n.lower().endswith((".js", ".html", ".htm", ".json", ".xml", ".css"))
+                   if n.startswith(("assets/", "res/raw/")) and n.lower().endswith((".js", ".mjs", ".html", ".htm", ".json", ".xml", ".css"))
                    and apk.members[n].file_size <= 4 * 1024 * 1024}
+        candidates, components = discover_entries(scripts)
         findings = scan_web(scripts)
+        for component in components:
+            findings.append(dict(id="native-html-template", title="Embedded HTML component needs Android integration",
+                                 action="This is a component, not a recovered app. " + "; ".join(component["dependencies"]), evidence=[component["path"]]))
         large = [n for n in names if n.startswith("assets/") and n.lower().endswith((".js", ".html", ".json", ".xml", ".css")) and apk.members[n].file_size > 4 * 1024 * 1024]
         if large:
             findings.append({"id": "scan-limit", "title": "Large text assets not scanned", "action": "Review these files manually.", "evidence": large})
-        native = [n for n in names if n.startswith("lib/") and n.endswith(".so")]
+        native = [n for n in names if n.endswith(".so")]
         dex = [n for n in names if re.fullmatch(r"classes\d*\.dex", n)]
         findings.append({"id": "android-runtime", "title": "Android runtime boundary", "action": "DEX, Android components, resources and native Android libraries are not translated. Only the selected web assets enter the IPK.", "evidence": dex + native + [c["name"] for c in manifest["components"]]})
         for key, pattern, title, action in RULES:
@@ -66,7 +67,8 @@ def inspect_apk(path: str | Path) -> dict:
         result = {"schema_version": 1, "source_name": path.name,
                   "sha256": digest,
                   "manifest": manifest, "member_count": len(names),
-                  "web_candidates": candidates, "dex_files": dex, "native_libraries": native,
+                  "web_candidates": candidates, "embedded_web_components": components,
+                  "dex_files": dex, "native_libraries": native,
                   "status": "web-assets-need-review" if candidates else "source-port-required",
                   "findings": findings,
                   "limits": ["Static inventory and text heuristics only; no complete call graph, DEX decompilation or behavior verification.",
@@ -81,7 +83,10 @@ def markdown(report: dict) -> str:
     lines = ["# APK compatibility report", "", f"Source: `{report['source_name']}`", f"SHA-256: `{report['sha256']}`",
              f"Android package: `{m['package']}`", f"Assessment: **{report['status']}**", "",
              "Packaging web assets is not Android runtime conversion. UI/API parity has not been verified.", "", "## Web candidates"]
-    lines += [f"- `{c['root']}/{c['entry']}`" for c in report["web_candidates"]] or ["No index.html/index.htm candidate found. Supply a ported web export."]
+    lines += [f"- `{c['path']}` ({c['kind']}; generated HTML: {c['generated']})" for c in report["web_candidates"]] or ["No standalone browser entry detected. Supply a ported web export."]
+    if report.get("embedded_web_components"):
+        lines += ["", "## Embedded HTML components (not complete apps)"]
+        lines += [f"- `{c['path']}`: " + "; ".join(c["dependencies"]) for c in report["embedded_web_components"]]
     for f in report["findings"]:
         lines += ["", "## " + f["title"], f["action"]]
         lines += [f"- `{v}`" for v in f["evidence"][:80]]

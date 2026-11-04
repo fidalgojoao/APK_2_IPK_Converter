@@ -7,13 +7,14 @@ import tempfile
 from .analyze import inspect_apk, scan_web, write_report
 from .archive import APK, ConversionError, read_web_directory, safe_name
 from .package import icon_png, make_ipk, validate_metadata, verify_ipk
+from .recover import bootstrap_html, discover_entries, GENERATED_ENTRY
 
 
 def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.0",
-            asset_root=None, entry="index.html", acknowledge=False, project_only=False):
+            asset_root=None, entry="index.html", acknowledge=False, project_only=False, bootstrap_script=None):
     if not apk_path and not web_dir:
         raise ConversionError("Supply an APK or a ported --web-dir.")
-    output = Path(output).absolute()
+    output = Path(output).resolve()
     if output.exists():
         raise ConversionError("Output must be a new directory; existing work is never overwritten.")
     report = inspect_apk(apk_path) if apk_path else None
@@ -25,18 +26,37 @@ def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.
     else:
         candidates = report["web_candidates"]
         if not asset_root:
+            if not candidates:
+                count = len(report.get("embedded_web_components", []))
+                raise ConversionError(f"No standalone browser entry detected. Found {count} Android-dependent HTML component(s) and {len(report['native_libraries'])} native libraries. Generating HTML cannot translate the Android UI or logic; supply a webOS/browser implementation.")
             if len(candidates) != 1:
                 raise ConversionError("No unique web root. Select --asset-root from the report or supply a source-built --web-dir. Native Android applications require a source port.")
             asset_root = candidates[0]["root"]
             if entry == "index.html":
                 entry = candidates[0]["entry"]
+            bootstrap_script = bootstrap_script or candidates[0].get("script")
         asset_root = safe_name(asset_root.rstrip("/"))
-        if not asset_root.startswith("assets/"):
-            raise ConversionError("APK web root must be inside assets/.")
+        if not (asset_root == "assets" or asset_root.startswith("assets/") or asset_root == "res/raw" or asset_root.startswith("res/raw/")):
+            raise ConversionError("APK web root must be inside assets/ or res/raw/.")
         prefix = asset_root + "/"
         with APK(apk_path) as apk:
             files = {n[len(prefix):]: apk.read(n) for n in apk.members if n.startswith(prefix)}
         origin = "apk-web-assets-only"
+    reconstruction = None
+    if entry not in files and not bootstrap_script:
+        options, _ = discover_entries(files)
+        if len(options) == 1:
+            option = options[0]
+            entry = GENERATED_ENTRY if option["generated"] else option["path"]
+            bootstrap_script = option.get("path") if option["generated"] else None
+    if bootstrap_script:
+        if entry == "index.html":
+            entry = GENERATED_ENTRY
+        if "/" in entry:
+            raise ConversionError("Generated HTML entry must be at the web folder root, such as apk2ipk-launch.html.")
+        if entry in files:
+            raise ConversionError("Generated HTML would overwrite an existing asset. Choose a new HTML entry filename.")
+        files[entry], reconstruction = bootstrap_html(files, bootstrap_script, title)
     safe_name(entry)
     if entry not in files:
         raise ConversionError(f"HTML entry not found in selected web root: {entry}")
@@ -62,6 +82,7 @@ def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.
                   "acknowledged_limitations": acknowledge, "web_findings": findings,
                   "findings_policy": "informational-only; no features filtered or bridge calls rewritten",
                   "source_apk_sha256": report["sha256"] if report else None,
+                  "html_reconstruction": reconstruction,
                   "asset_sha256": {n: hashlib.sha256(d).hexdigest() for n, d in sorted(files.items())},
                   "excluded_android_content": ["DEX code", "Android native libraries", "Android manifest and resources", "Android permissions and services"],
                   "validation_required": ["Launch and navigation using LG remote", "Authentication and external APIs", "Media codecs and DRM", "All native bridge/plugin replacements", "Target webOS browser compatibility, storage and lifecycle"]}

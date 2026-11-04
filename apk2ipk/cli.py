@@ -25,6 +25,7 @@ def parser():
     c.add_argument("--web-dir", type=Path, help="Ported web export; takes precedence over APK assets")
     c.add_argument("--asset-root", help="APK member prefix, e.g. assets/www")
     c.add_argument("--entry", default="index.html")
+    c.add_argument("--bootstrap-script", help="Generate entry HTML around this browser JS script, relative to the selected web folder")
     c.add_argument("--id", required=True, dest="app_id")
     c.add_argument("--title", required=True)
     c.add_argument("--app-version", default="1.0.0", dest="version")

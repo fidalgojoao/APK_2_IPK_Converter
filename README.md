@@ -27,6 +27,8 @@ Or double-click `launch.py` on a Python/Tk installation. On Debian/Ubuntu, insta
 
 ## CLI
 
+Version 0.3.0 can recover a missing HTML entry **when the APK already contains browser-compatible JavaScript**. It also finds non-index HTML names and HTML under `res/raw/`. It distinguishes Android-dependent HTML templates from standalone candidates. Explicit component export remains allowed. See [entry recovery and Reezn findings](docs/RECOVERY.md).
+
 Inspect without executing APK code:
 
 ```sh

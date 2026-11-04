@@ -21,7 +21,7 @@ REA `open_binary` and `inspect_artifact(detail="summary")` independently inspect
 Summary Evidence ID: `ev_00b9103fd275a42304f62244cc76b3cd23ef79b7d25b3eeaea8ca54730c022f2`.
 Parent inspection ID: `ev_70ccc47c721385e57636a7cb8554ee4fa264630b03e9edc1c319771019ffada8`.
 
-REA explicitly limits this result to container entries and static observations. It does not establish application runtime behavior, APK signing validity or full format semantics. No real Android APK was provided. This synthetic fixture is not installable on Android. The REA session was closed after inspection.
+REA explicitly limits this result to container entries and static observations. It does not establish application runtime behavior, APK signing validity or full format semantics. This initial synthetic fixture is not installable on Android. The REA session was closed after inspection. A subsequent real Reezn APK investigation is documented in [RECOVERY.md](RECOVERY.md), including the Android decompiler engine-version limitation.
 
 ## Graphify
 
@@ -29,4 +29,6 @@ A local code-only graph was extracted and clustered without model/API credential
 
 ## Outstanding runtime validation
 
-No LG TV was connected. No Android APK was executed, no real third-party app was converted, and no claim of UI, API or feature parity has been verified. TV installation, remote navigation, browser engine support, authentication, DRM, codecs, permissions and store eligibility remain device/app-specific acceptance work.
+No LG TV was connected. No Android APK was executed, no real third-party app was converted into a working equivalent, and no claim of UI, API or feature parity has been verified. TV installation, remote navigation, browser engine support, authentication, DRM, codecs, permissions and store eligibility remain device/app-specific acceptance work.
+
+Version 0.3.0 adds 11 tests for alternate HTML locations, generated HTML around browser JavaScript, module entries, stylesheet/mount recovery, unchanged assets and Android-dependent component handling (43 total tests). The source GUI smoke test now runs both an APK with HTML and a browser-JS APK with no HTML. The Windows build runs the same test inside the frozen executable. A generated no-index demo is included under `examples/no-index-web/`. An attempted local browser preview could not reach the sandbox loopback HTTP server, so interactive browser behavior was not verified in this session; package and GUI workflow checks do not imply browser/TV acceptance.
