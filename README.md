@@ -8,6 +8,10 @@ An offline desktop app and command-line toolkit for inspecting Android APKs, pre
 
 ## Start
 
+**Windows, no coding required:** [Download APK2IPK-Studio.exe](https://github.com/fidalgojoao/APK_2_IPK_Converter/releases/download/desktop-latest/APK2IPK-Studio.exe), double-click it, click **Choose APK…**, then **Convert to IPK**. The app fills in the technical settings and save location automatically. Click **Open output folder** when finished. Python and Tk are bundled in this executable. See [download instructions](docs/DOWNLOAD.md).
+
+To run from source instead:
+
 ```sh
 git clone https://github.com/fidalgojoao/APK_2_IPK_Converter.git
 cd APK_2_IPK_Converter
@@ -16,10 +20,10 @@ python -m apk2ipk gui
 
 Or double-click `launch.py` on a Python/Tk installation. On Debian/Ubuntu, install your distribution's `python3-tk` if Tk is absent. Optional installation: `python -m pip install .`, then `apk2ipk gui`. No installation is needed when running from the checkout. On some systems use `python3` instead of `python`.
 
-1. Select an APK and **Analyze APK**. Read the report and choose the web root if several entries exist.
-2. For native apps, build a web version from source and select **Ported web directory**. This takes precedence over APK web assets.
-3. Enter a unique webOS ID, title, version, HTML entry and a new output directory.
-4. **Build project + IPK**. Review the generated report and install/test the IPK on your TV.
+1. Click **Choose APK…**. The app reads it automatically and fills in the settings.
+2. Optionally change the TV app name and save location. Additional options are under **Advanced settings**.
+3. Click **Convert to IPK**, then **Open output folder**.
+4. Install/test the IPK on your TV. Native Android apps require a source port; an already rebuilt web folder can be selected under **Advanced settings**.
 
 ## CLI
 

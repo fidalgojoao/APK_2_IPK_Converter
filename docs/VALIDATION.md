@@ -6,7 +6,7 @@ Development validation date: 2026-11-04. Scope is the implementation and generat
 
 The unittest suite covers plain and binary Android manifests (both UTF-8 and UTF-16 string pools), binary-manifest end-to-end conversion, native-app port requirement, candidate selection, arbitrary asset and bridge-call preservation, optional acknowledgements, web directory input, output preservation, deterministic package construction, package tampering, metadata rules, path traversal, file/directory collisions, case collisions, symlinks, size limits, split/bundle rejection and CLI flows.
 
-The desktop UI was constructed successfully with Tk on the Windows development host. This is a construction smoke test; it does not establish complete interactive UI coverage or cross-platform GUI behavior.
+The desktop UI was constructed successfully with Tk on the Windows development host. The version 0.2.0 smoke test selects a generated APK, waits for automatic analysis and defaults, invokes the Convert button, waits for completion, and verifies the resulting IPK. It passed with Python 3.15 and 3.13 on the development host. Four additional tests cover automatic metadata, stable TV identity across APK updates, unusual labels/versions and output collision avoidance. The desktop build workflow also runs this path inside the bundled Windows executable before publishing it. These checks do not establish full interactive UI coverage or TV behavior.
 
 ## LG CLI cross-check
 
