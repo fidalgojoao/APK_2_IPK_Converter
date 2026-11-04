@@ -8,7 +8,7 @@ An offline desktop app and command-line toolkit for inspecting Android APKs, pre
 
 ## Start
 
-**Windows, no coding required:** [Download APK2IPK-Studio.exe](https://github.com/fidalgojoao/APK_2_IPK_Converter/releases/download/desktop-latest/APK2IPK-Studio.exe), double-click it, click **Choose APK…**, then **Convert to IPK**. The app fills in the technical settings and save location automatically. Click **Open output folder** when finished. Python and Tk are bundled in this executable. See [download instructions](docs/DOWNLOAD.md).
+**Windows, no coding required:** [Download APK2IPK-Studio-0.4.0.exe](https://github.com/fidalgojoao/APK_2_IPK_Converter/releases/download/desktop-latest/APK2IPK-Studio-0.4.0.exe), close older copies and double-click the downloaded file. Check that the window title shows **0.4.0**, click **Choose APK…**, then **Convert to IPK**. The app fills in the settings and save location automatically. Click **Open output folder** when finished. Python and Tk are bundled. See [download instructions](docs/DOWNLOAD.md).
 
 To run from source instead:
 

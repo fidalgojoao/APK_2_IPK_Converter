@@ -2,7 +2,7 @@
 
 Current application version: **0.4.0** (shown in the window title).
 
-Download **APK2IPK-Studio.exe** from the assets below and double-click it. No installation, Python or terminal commands are required. This download targets Windows x64.
+Download **APK2IPK-Studio-0.4.0.exe** from the assets below and double-click it. Close any older copy first. The window title must show **0.4.0**. No installation, Python or terminal commands are required. This download targets Windows x64. Versioned filenames distinguish the fixed executable from earlier files in your Downloads folder; each future release also publishes its own versioned filename and checksum.
 
 1. Click **Choose APK…** and select your Android app file.
 2. Let the app fill in the name and output folder. You can change either.

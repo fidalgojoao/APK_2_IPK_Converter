@@ -47,8 +47,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          app_version=$(python -c "from apk2ipk import __version__; print(__version__)")
+          [[ "$app_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          versioned_exe="dist/APK2IPK-Studio-${app_version}.exe"
+          cp dist/APK2IPK-Studio.exe "$versioned_exe"
+          sha256sum "$versioned_exe" > "${versioned_exe}.sha256"
           if ! gh release view desktop-latest > /dev/null 2>&1; then
             gh release create desktop-latest --target "$GITHUB_SHA" --title "APK2IPK Studio — Windows download" --notes-file docs/DOWNLOAD.md
           fi
           gh release edit desktop-latest --title "APK2IPK Studio — Windows download" --notes-file docs/DOWNLOAD.md
           gh release upload desktop-latest dist/APK2IPK-Studio.exe --clobber
+          gh release upload desktop-latest "$versioned_exe" "${versioned_exe}.sha256" --clobber

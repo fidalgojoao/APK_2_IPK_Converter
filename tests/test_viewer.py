@@ -80,3 +80,19 @@ class ContentViewerTests(unittest.TestCase):
         files = {"apk-content/res/layout/a.xml": b'\x03\x00\x08\x00Android.anything https://schema',
                  "_apk2ipk/content.json": b'{"nativeText":"Android.bridge()"}'}
         self.assertEqual(scan_web(files), [])
+
+    def test_fallback_is_independent_of_app_name_and_native_framework(self):
+        cases = [("org.sample.notes", "Notes", "lib/arm64-v8a/libflutter.so"),
+                 ("com.example.game", "Game", "lib/armeabi-v7a/libunity.so"),
+                 ("net.anycompany.tool", "Unknown Tool", "lib/x86_64/libcustom.so")]
+        for index, (package, title, library) in enumerate(cases):
+            with self.subTest(package=package):
+                apk = self.root / f"application-{index}.apk"
+                with zipfile.ZipFile(apk, "w") as archive:
+                    archive.writestr("AndroidManifest.xml", f'<manifest package="{package}"><application/></manifest>')
+                    archive.writestr("classes.dex", b"native code")
+                    archive.writestr(library, b"native library")
+                    archive.writestr("assets/readme.txt", title)
+                result = convert(apk_path=apk, output=self.root / f"out-{index}", app_id=f"org.test.app{index}", title=title)
+                self.assertEqual(result["mode"], "generated-content-viewer")
+                self.assertEqual(verify_ipk(result["ipk"])["appinfo"]["main"], "index.html")
