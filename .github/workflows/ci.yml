@@ -1,0 +1,40 @@
+name: Tests and LG package verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install .
+      - run: python -m unittest discover -s tests -v
+      - run: python -m apk2ipk doctor
+  official-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --prefix .webos-tools --ignore-scripts --no-audit --no-fund @webos-tools/cli@3.2.6
+      - run: python tools/check_official.py --cli-js .webos-tools/node_modules/@webos-tools/cli/bin/ares-package.js
+      - run: python -m apk2ipk convert --web-dir examples/tv-web --id com.example.apk2ipk.demo --title "APK2IPK TV Demo" --output demo-build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-webos-project-and-ipk
+          path: demo-build/

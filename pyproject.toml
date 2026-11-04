@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apk2ipk"
+version = "0.1.0"
+description = "Local APK analysis and assisted web asset porting to LG webOS TV"
+requires-python = ">=3.11"
+license = "MIT"
+readme = "README.md"
+dependencies = []
+
+[project.scripts]
+apk2ipk = "apk2ipk.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["apk2ipk*"]
