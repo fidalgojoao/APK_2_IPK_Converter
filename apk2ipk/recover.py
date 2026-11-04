@@ -5,7 +5,7 @@ import re
 from urllib.parse import quote
 from .archive import ConversionError, safe_name
 
-GENERATED_ENTRY = "apk2ipk-launch.html"
+GENERATED_ENTRY = "index.html"
 TEXT_LIMIT = 4 * 1024 * 1024
 
 

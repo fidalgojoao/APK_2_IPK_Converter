@@ -77,7 +77,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(report["web_candidates"], [])
         self.assertEqual(len(report["embedded_web_components"]), 1)
         with self.assertRaises(ConversionError):
-            self.build()
+            self.build(require_web_app=True)
         # An explicit component export is allowed, without modifying native calls.
         result = self.build(asset_root="res/raw", entry="ayp_youtube_player.html")
         self.assertTrue(verify_ipk(result["ipk"])["valid_structure"])

@@ -1,5 +1,7 @@
 # Architecture
 
+`viewer.py` is the no-entry fallback. It generates an explicitly labelled content viewer and namespaced copies of selected resources. It can produce an IPK without pretending that Android code was translated. `convert.py` records `mode: generated-content-viewer` and `original_android_app_functionality: false` for this path.
+
 `cli.py` and `gui.py` share the same analysis, project creation and packaging functions. GUI work runs on a worker thread and delivers results through a queue; Tk updates remain on the UI thread.
 
 `recover.py` discovers alternate HTML entries, identifies Android-dependent HTML templates, and can construct the missing HTML document around an existing browser JavaScript entry. Generated-document provenance is included in the conversion report. This layer does not translate native code or implement Android bridges.

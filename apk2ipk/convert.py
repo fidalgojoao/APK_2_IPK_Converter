@@ -8,10 +8,12 @@ from .analyze import inspect_apk, scan_web, write_report
 from .archive import APK, ConversionError, read_web_directory, safe_name
 from .package import icon_png, make_ipk, validate_metadata, verify_ipk
 from .recover import bootstrap_html, discover_entries, GENERATED_ENTRY
+from .viewer import create_content_viewer
 
 
 def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.0",
-            asset_root=None, entry="index.html", acknowledge=False, project_only=False, bootstrap_script=None):
+            asset_root=None, entry="index.html", acknowledge=False, project_only=False, bootstrap_script=None,
+            require_web_app=False):
     if not apk_path and not web_dir:
         raise ConversionError("Supply an APK or a ported --web-dir.")
     output = Path(output).resolve()
@@ -26,21 +28,24 @@ def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.
     else:
         candidates = report["web_candidates"]
         if not asset_root:
-            if not candidates:
+            if not candidates and require_web_app:
                 count = len(report.get("embedded_web_components", []))
                 raise ConversionError(f"No standalone browser entry detected. Found {count} Android-dependent HTML component(s) and {len(report['native_libraries'])} native libraries. Generating HTML cannot translate the Android UI or logic; supply a webOS/browser implementation.")
-            if len(candidates) != 1:
+            if len(candidates) > 1:
                 raise ConversionError("No unique web root. Select --asset-root from the report or supply a source-built --web-dir. Native Android applications require a source port.")
-            asset_root = candidates[0]["root"]
-            if entry == "index.html":
-                entry = candidates[0]["entry"]
-            bootstrap_script = bootstrap_script or candidates[0].get("script")
-        asset_root = safe_name(asset_root.rstrip("/"))
-        if not (asset_root == "assets" or asset_root.startswith("assets/") or asset_root == "res/raw" or asset_root.startswith("res/raw/")):
-            raise ConversionError("APK web root must be inside assets/ or res/raw/.")
-        prefix = asset_root + "/"
+            if candidates:
+                asset_root = candidates[0]["root"]
+                if entry == "index.html":
+                    entry = candidates[0]["entry"]
+                bootstrap_script = bootstrap_script or candidates[0].get("script")
+        if asset_root:
+            asset_root = safe_name(asset_root.rstrip("/"))
+            if not (asset_root == "assets" or asset_root.startswith("assets/") or asset_root == "res/raw" or asset_root.startswith("res/raw/")):
+                raise ConversionError("APK web root must be inside assets/ or res/raw/.")
+        prefix = asset_root + "/" if asset_root else None
         with APK(apk_path) as apk:
-            files = {n[len(prefix):]: apk.read(n) for n in apk.members if n.startswith(prefix)}
+            files = {(n[len(prefix):] if prefix else n): apk.read(n) for n in apk.members
+                     if (n.startswith(prefix) if prefix else n.startswith(("assets/", "res/")))}
         origin = "apk-web-assets-only"
     reconstruction = None
     if entry not in files and not bootstrap_script:
@@ -49,6 +54,10 @@ def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.
             option = options[0]
             entry = GENERATED_ENTRY if option["generated"] else option["path"]
             bootstrap_script = option.get("path") if option["generated"] else None
+        elif not options and entry == "index.html" and not require_web_app:
+            files, reconstruction = create_content_viewer(files, title)
+            origin = "generated-content-viewer"
+            title += " — APK content"
     if bootstrap_script:
         if entry == "index.html":
             entry = GENERATED_ENTRY
@@ -84,7 +93,7 @@ def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.
                   "source_apk_sha256": report["sha256"] if report else None,
                   "html_reconstruction": reconstruction,
                   "asset_sha256": {n: hashlib.sha256(d).hexdigest() for n, d in sorted(files.items())},
-                  "excluded_android_content": ["DEX code", "Android native libraries", "Android manifest and resources", "Android permissions and services"],
+                  "excluded_android_content": (["Android runtime/code translation", "Android permissions and service implementations"] if origin == "generated-content-viewer" else ["DEX code", "Android native libraries outside the selected tree", "Android manifest and unselected resources", "Android permissions and services"]),
                   "validation_required": ["Launch and navigation using LG remote", "Authentication and external APIs", "Media codecs and DRM", "All native bridge/plugin replacements", "Target webOS browser compatibility, storage and lifecycle"]}
     files["appinfo.json"] = json.dumps(info, indent=2, ensure_ascii=False).encode()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -110,4 +119,5 @@ def convert(*, apk_path=None, web_dir=None, output, app_id, title, version="1.0.
         shutil.rmtree(temp)
         raise
     return {"output": str(output), "ipk": str(output / name) if not project_only else None,
-            "web_findings": findings, "runtime_verified": False}
+            "web_findings": findings, "runtime_verified": False, "mode": origin,
+            "html_reconstruction": reconstruction}

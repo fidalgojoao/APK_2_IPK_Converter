@@ -1,5 +1,15 @@
 # Missing HTML entry recovery (0.3.0)
 
+## Version 0.4.0: always-create fallback
+
+When no browser entry is detected, Convert now creates `index.html`, a resource manifest and a content-viewer interface, then builds the IPK. APK files under `assets/` and `res/` are retained byte-for-byte under `apk-content/`. Original file paths remain relative within that tree. Images, media, readable text and HTML components can be browsed with search, category filtering, pagination and D-pad focus. Unknown files remain present with an explanation that they cannot be previewed. Binary Android XML is not presented as decoded UI.
+
+The title and persistent banner explicitly state that this is an **APK content viewer**, not the original Android app. Android classes, native libraries, authentication and backend logic are not translated. Native `.so` files within the resource tree remain inert data. HTML components are rendered in an iframe sandbox so their scripts cannot control the viewer; their Android callbacks remain unavailable. Text is displayed as literal text, never injected as HTML. Media depends on TV codec support. Large text previews are limited to 4096 bytes; original files are retained fully.
+
+The fallback can also wrap a user-supplied non-web directory. Existing input files are preserved in the namespace, so a source file named `index.html` cannot overwrite generated viewer files. Explicit invalid entry filenames and output paths still produce normal input errors. `--require-web-app` disables content-viewer generation for workflows that require a recovered browser application.
+
+The Reezn investigation below remains accurate about native functionality. Version 0.4.0 successfully creates a **content-viewer IPK from that APK**, not a functional port of Reezn.
+
 Creating HTML is useful when an APK already contains code that a browser can execute. It is not a way to turn arbitrary Android bytecode, JNI libraries or native layouts into a functioning web app.
 
 ## Recovery paths implemented

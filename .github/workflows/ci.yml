@@ -34,7 +34,12 @@ jobs:
       - run: npm install --prefix .webos-tools --ignore-scripts --no-audit --no-fund @webos-tools/cli@3.2.6
       - run: python tools/check_official.py --cli-js .webos-tools/node_modules/@webos-tools/cli/bin/ares-package.js
       - run: python -m apk2ipk convert --web-dir examples/tv-web --id com.example.apk2ipk.demo --title "APK2IPK TV Demo" --output demo-build
+      - run: python -m apk2ipk convert --web-dir examples/content-only --id org.example.content --title "Content viewer demo" --output content-demo
+      - run: node tools/check_viewer.js content-demo/app/_apk2ipk/viewer.js
+      - run: python -m apk2ipk verify content-demo/org.example.content_1.0.0_all.ipk
       - uses: actions/upload-artifact@v4
         with:
           name: demo-webos-project-and-ipk
-          path: demo-build/
+          path: |
+            demo-build/
+            content-demo/

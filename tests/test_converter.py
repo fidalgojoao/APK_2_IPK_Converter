@@ -85,7 +85,7 @@ class ConverterTests(unittest.TestCase):
         self.assertTrue(report['native_libraries'])
         self.assertIn('flutter', [f['id'] for f in report['findings']])
         with self.assertRaises(ConversionError):
-            self.build()
+            self.build(require_web_app=True)
         self.assertFalse((self.root / 'out').exists())
 
     def test_roundtrip_web_candidate(self):

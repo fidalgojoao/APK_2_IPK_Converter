@@ -217,12 +217,6 @@ class App:
             self.pick_output()
             if not self.output.get():
                 return
-        if self.report and not self.report["web_candidates"] and not self.web.get() and not self.asset_root.get():
-            self.status.set("No standalone browser entry was detected.")
-            parts = self.report.get("embedded_web_components", [])
-            details = ("Found " + ", ".join(c["path"] for c in parts) + ". These are embedded components with Android dependencies, not the complete app. ") if parts else ""
-            self.summary.set(details + "Adding an HTML file cannot translate the native Android screens or logic. A separate webOS implementation is required.\n\nNo features were disabled. View details for the detected content, or use Advanced settings to explicitly export a component.")
-            return
         if Path(self.output.get()).exists():
             if self.last_output and Path(self.output.get()) == self.last_output:
                 self.output.set(str(next_output(self.last_output.parent / Path(self.apk.get() or "My-TV-App.apk").name)))
@@ -282,7 +276,7 @@ class App:
                     getattr(self, key).set(val)
                 self.details_text = markdown(result)
                 count = len(result["web_candidates"])
-                self.status.set("APK ready — click Convert to IPK." if count else "APK read — this app needs a webOS version.")
+                self.status.set("APK ready — click Convert to IPK." if count else "Ready — Convert will create index.html and a content viewer IPK.")
                 if count:
                     extra = " Multiple web folders were found; Advanced settings lets you choose another." if count > 1 else ""
                     generated = " A new HTML page will be generated to load the detected browser JavaScript." if self.bootstrap_script.get() else ""
@@ -290,12 +284,14 @@ class App:
                 else:
                     components = result.get("embedded_web_components", [])
                     detail = (f"Found {len(components)} embedded HTML component(s) that need Android data/callbacks, not a complete browser app. " if components else "No standalone HTML or supported browser JavaScript entry was detected. ")
-                    self.summary.set(detail + "The Android screens and logic cannot be turned into a working app merely by adding index.html.\n\nNative libraries: " + str(len(result["native_libraries"])) + ". View details for evidence. Advanced settings can explicitly select an embedded component.")
+                    self.summary.set(detail + "Click Convert to generate index.html with a searchable viewer for the APK's images, media, text and HTML components.\n\nThis creates a new content viewer, not a working copy of the Android app. Its native screens, accounts and APIs are not translated.")
             else:
                 self.last_output = Path(result["output"]).resolve()
                 self.open_button.configure(state="normal")
-                self.status.set("Done — your IPK file is ready.")
-                self.summary.set(Path(result["ipk"]).name + "\n\nSaved in: " + str(self.last_output) + "\n\nClick Open output folder to find your file. Install and test it on your LG TV; original Android functionality is not automatically preserved.")
+                viewer = result.get("mode") == "generated-content-viewer"
+                self.status.set("Done — index.html and your content viewer IPK are ready." if viewer else "Done — your IPK file is ready.")
+                note = "This IPK opens a new APK content viewer. It does not run the original Android app." if viewer else "Original Android functionality is not automatically preserved."
+                self.summary.set(Path(result["ipk"]).name + "\n\nSaved in: " + str(self.last_output) + "\n\n" + note + " Click Open output folder to find your file. TV behavior still requires testing.")
                 self.details_text = self.summary.get() + "\n\nDependency findings:\n" + "\n".join(f["title"] + ": " + f["action"] for f in result["web_findings"])
         self.root.after(100, self.poll)
 
@@ -324,17 +320,21 @@ def smoke_test():
                     time.sleep(0.02)
                 if app.busy:
                     raise RuntimeError("GUI worker timed out")
-            for generated in (False, True):
-                apk = Path(directory) / ("No HTML App.apk" if generated else "Sample App.apk")
+            for case in ("html", "javascript", "native"):
+                generated = case == "javascript"
+                apk = Path(directory) / (case + " App.apk")
                 with zipfile.ZipFile(apk, "w") as archive:
                     archive.writestr("AndroidManifest.xml", '<manifest package="org.example.smoketest"><application/></manifest>')
                     if generated:
                         archive.writestr("assets/www/main.js", 'document.getElementById("app").textContent = "Recovered";')
-                    else:
+                    elif case == "html":
                         archive.writestr("assets/www/index.html", "<!doctype html><html><body>GUI test</body></html>")
+                    else:
+                        archive.writestr("classes.dex", b"native Android code")
+                        archive.writestr("assets/readme.txt", "Native APK content viewer test")
                 app.select_apk(apk)
                 wait()
-                if app.report is None or not app.asset_root.get():
+                if app.report is None or (case != "native" and not app.asset_root.get()):
                     raise RuntimeError("Automatic APK selection/analysis failed")
                 if bool(app.bootstrap_script.get()) != generated:
                     raise RuntimeError("HTML recovery mode was not selected correctly")
@@ -343,5 +343,7 @@ def smoke_test():
                 if not app.last_output:
                     raise RuntimeError("GUI conversion failed: " + app.summary.get())
                 verify_ipk(next(app.last_output.glob("*.ipk")))
+                if case == "native" and not (app.last_output / "app/index.html").exists():
+                    raise RuntimeError("Native APK fallback did not generate index.html")
         finally:
             root.destroy()

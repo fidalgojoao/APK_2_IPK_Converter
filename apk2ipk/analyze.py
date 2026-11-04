@@ -23,12 +23,17 @@ RULES = [
 def scan_web(files: dict[str, bytes]) -> list[dict]:
     found = {}
     for name, data in files.items():
+        if name.startswith("_apk2ipk/") or data.startswith(b"\x03\x00\x08\x00"):
+            continue
         if not name.lower().endswith((".js", ".mjs", ".html", ".htm", ".json", ".xml", ".css")):
             continue
         if len(data) > 4 * 1024 * 1024:
             found.setdefault("scan-limit", {"id": "scan-limit", "title": "Large text asset not scanned", "action": "Review text assets larger than 4 MiB manually.", "evidence": []})["evidence"].append(name)
             continue
-        text = data.decode("utf-8", errors="replace")
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
         for key, pattern, title, action in RULES:
             if re.search(pattern, text + "\n" + name, re.I):
                 found.setdefault(key, {"id": key, "title": title, "action": action, "evidence": []})["evidence"].append(name)

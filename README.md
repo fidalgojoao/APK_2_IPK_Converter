@@ -27,6 +27,8 @@ Or double-click `launch.py` on a Python/Tk installation. On Debian/Ubuntu, insta
 
 ## CLI
 
+**Version 0.4.0: no-entry fallback.** If no browser entry is recoverable, conversion generates `index.html` and an offline APK content viewer automatically. It retains resources under `apk-content/` and provides search, filters, pagination, previews and remote focus navigation. The generated app is clearly labelled as a content viewer; it does not execute the original Android app. Use `--require-web-app` to reject this fallback when you need a recovered web app exclusively.
+
 Version 0.3.0 can recover a missing HTML entry **when the APK already contains browser-compatible JavaScript**. It also finds non-index HTML names and HTML under `res/raw/`. It distinguishes Android-dependent HTML templates from standalone candidates. Explicit component export remains allowed. See [entry recovery and Reezn findings](docs/RECOVERY.md).
 
 Inspect without executing APK code:
